@@ -1,0 +1,8 @@
+login()
+logout()
+setCookieJar($filename='./cookie')
+getRank()
+getSubjectTimetable()
+getLevelGrade()
+getGrade($data = '')
+getOriginGrade()
