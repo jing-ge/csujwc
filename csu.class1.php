@@ -10,7 +10,6 @@
 		public $pwd;
 		public $encoded;
 		public $cookieJar;
-		public $URL_API=[];
 		public $state ;
 		function __construct($userid,$pwd)
 		{
