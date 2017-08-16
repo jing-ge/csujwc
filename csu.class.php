@@ -65,9 +65,15 @@
 			$html = new simple_html_dom();
 			$html->load($res);
 			$tr = $html->find('tr',2);
-			$rank["计算学分"]=$tr->children(1)->plaintext;
-			$rank["专业排名"]=$tr->children(2)->plaintext;
-			$rank["平均分"]=$tr->children(3)->plaintext;
+			if ($tr) {
+				$rank["计算学分"]=$tr->children(1)->plaintext;
+				$rank["专业排名"]=$tr->children(2)->plaintext;
+				$rank["平均分"]=$tr->children(3)->plaintext;
+			}else{
+				$rank["计算学分"]=0;
+				$rank["专业排名"]=0;
+				$rank["平均分"]=0;
+			}
 			return $rank;
 		}
 		//查询课表接口
@@ -311,9 +317,9 @@
 		}
 	}
 	
-	$student = new CSU('4201150121','f675324370');
+	$student = new CSU('4201150120','FLCwan20140607');
 	$student->login();
-	$re = $student->getSubjectTimetable();
+	$re = $student->getRank();
 	//$re = $student->getLevelGrade();
 	//$student->cookieJar;
 	var_dump($re);
