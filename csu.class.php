@@ -416,8 +416,5 @@
 			return $url;
 		}
 	}
-	$stu = new CSU('4201150121','f675324370');
-	$stu -> login();
-	$stu->oneKeyPingjiao();
 
  ?>
