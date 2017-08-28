@@ -11,8 +11,11 @@
 		public $encoded;
 		public $cookieJar;
 		public $state ;
+		public $pingjiaoInfo;
+		private $PreUrl;
 		function __construct($userid,$pwd)
 		{
+			$this->setPreUrl();
 			$this->userid = $userid;
 			$this->pwd = $pwd;
 			$this->warning();
@@ -49,7 +52,7 @@
 		public function getRank()
 		{
 			$cookieJar = $this->cookieJar;
-			$url = "http://jwctest.its.csu.edu.cn/jsxsd/kscj/zybm_cx";
+			$url = $this->PreUrl."/jsxsd/kscj/zybm_cx";
 			$header = array(
 				"User-Agent" => "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
 				);
@@ -80,7 +83,7 @@
 		public function getSubjectTimetable()
 		{
 			$cookieJar = $this->cookieJar;
-			$url = "http://jwctest.its.csu.edu.cn/jsxsd/xskb/xskb_list.do?Ves632DSdyV=NEW_XSD_WDKB";
+			$url = $this->PreUrl."/jsxsd/xskb/xskb_list.do?Ves632DSdyV=NEW_XSD_WDKB";
 			$header = array(
 				"User-Agent" => "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
 				);
@@ -142,7 +145,7 @@
 		public function getLevelGrade()
 		{
 			$cookieJar = $this->cookieJar;
-			$url = "http://jwctest.its.csu.edu.cn/jsxsd/kscj/djkscj_list";
+			$url = $this->PreUrl."/jsxsd/kscj/djkscj_list";
 			$header = array(
 				"User-Agent" => "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
 				);
@@ -183,7 +186,7 @@
 		public function getGrade($data = '')
 		{
 			$cookieJar = $this->cookieJar;
-			$url = "http://jwctest.its.csu.edu.cn/jsxsd/kscj/cjcx_list";
+			$url = $this->PreUrl."/jsxsd/kscj/cjcx_list";
 			$postData = "xnxq01id=".$data;
 			$header = array(
 				"User-Agent" => "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36",
@@ -218,7 +221,7 @@
 		public function getOriginGrade()
 		{
 			$cookieJar = $this->cookieJar;
-			$url = "http://jwctest.its.csu.edu.cn/jsxsd/kscj/yscjcx_list";
+			$url = $this->PreUrl."/jsxsd/kscj/yscjcx_list";
 			$header = array(
 				"User-Agent" => "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
 				);
@@ -254,6 +257,77 @@
 			}
 			return $grade;
 		}
+		//获得评教信息
+		public function getPingjiaoInfo()
+		{
+			$url = $this->PreUrl."/jsxsd/xspj/xspj_find.do?Ves632DSdyV=NEW_XSD_JXPJ";
+			$res = $this->http($url);
+			$html = new simple_html_dom();
+			$html->load($res);
+			$as = $html->find('a');
+			foreach ($as as $a) {
+				$str = "jsxsd/xspj/xspj_list.do";
+				$re = strstr($a->href,$str);
+				if($re){
+					$final_url = $this->PreUrl.$a->href;
+				}
+				
+			}
+			$re =$this->http($final_url);
+			$html2 = new simple_html_dom();
+			$html2->load($re);
+			$tr = $html2->find('tr');
+			$i=0;
+			foreach ($tr as $k=>$v) {
+				if ($k<=1) {
+					continue;
+				}
+				if (strlen($v->children(0)->plaintext)>10) {
+
+					break;
+				}
+				$info[$i]["序号"] = $v->children(0)->plaintext;
+				$info[$i]["课程编号"] = $v->children(1)->plaintext;
+				$info[$i]["课程名称"] = $v->children(2)->plaintext;
+				$info[$i]["授课教师"] = $v->children(3)->plaintext;
+				$info[$i]["评价类别"] = $v->children(4)->plaintext;
+				$info[$i]["总评分"] = $v->children(5)->plaintext;
+				$info[$i]["已评"] = $v->children(6)->plaintext;
+				$info[$i]["是否提交"] = $v->children(7)->plaintext;	
+				$info[$i]["很满意"] = $this->getPingjiaoUrl($v->children(9)->children(2)->attr['href']);
+				$info[$i]["需改进"] = $this->getPingjiaoUrl($v->children(9)->children(3)->attr['href']);
+				$i++;
+			}
+			$this->pingjiaoInfo = $info;
+			return $info;
+		}
+
+		//一键评教
+		public function oneKeyPingjiao()
+		{
+			if (!$this->pingjiaoInfo) {
+				$this->getPingjiaoInfo();
+			}
+			//这里暂时有问题
+			$data = "cj0701id=&pj0502id1=2C3C472A578849E5BCDA195CCD8158BF&isissub=1&isissub=1&isissub=1&isissub=1&isissub=1&isissub=1&isissub=1&isissub=1&isissub=1&isissub=1&isissub=1&pjrs=3&myyprs=3&gjyprs=3&pj0502id=2C3C472A578849E5BCDA195CCD8158BF&xnxq01id=2016-2017-2&tjzt=0";
+			$res = $this->http($this->pingjiaoInfo[0]['很满意'],$postData=$data);
+			foreach ($this->pingjiaoInfo as $v) {
+				$res = $this->http($v['很满意'],$postData=$data);
+				var_dump($res);
+			}
+			$url = $this->PreUrl."/jsxsd/xspj/pltj_save.do";
+			$res = $this->http($url,$postData=$data);
+			var_dump($res);	
+			var_dump($this->pingjiaoInfo);	
+		}
+		public function setPreUrl($option=1)
+		{
+			if ($option==1) {
+				$this->PreUrl = "http://csujwc.its.csu.edu.cn";
+			}else{
+				$this->PreUrl = "http://jwctest.its.csu.edu.cn/";
+			}
+		}
 
 		//加密形成encoded
 		private function encoded()
@@ -268,7 +342,7 @@
 			$encoded="encoded=".urlencode($this->encoded);
 			$cookieJar = $this->cookieJar;
 			$ch =curl_init();  
-			curl_setopt($ch,CURLOPT_URL,"http://jwctest.its.csu.edu.cn/jsxsd/");   
+			curl_setopt($ch,CURLOPT_URL,$this->PreUrl."/jsxsd/");   
 			curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);  
 			curl_setopt($ch,CURLOPT_HEADER,1);
 			curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieJar);
@@ -279,7 +353,7 @@
 				"Content-Type" => "application/x-www-form-urlencoded"
 				);
 			$ch =curl_init();  
-			curl_setopt($ch,CURLOPT_URL,"http://jwctest.its.csu.edu.cn/jsxsd/xk/LoginToXk");   
+			curl_setopt($ch,CURLOPT_URL,$this->PreUrl."/jsxsd/xk/LoginToXk");   
 			curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);  
 			curl_setopt($ch,CURLOPT_HEADER,1);
 			curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
@@ -290,7 +364,7 @@
 			curl_close($ch);
 
 			$ch =curl_init();  
-			curl_setopt($ch,CURLOPT_URL,"http://jwctest.its.csu.edu.cn/jsxsd/framework/xsMain.jsp");   
+			curl_setopt($ch,CURLOPT_URL,$this->PreUrl."/jsxsd/framework/xsMain.jsp");   
 			curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);  
 			curl_setopt($ch,CURLOPT_HEADER,1);
 			curl_setopt($ch, CURLOPT_NOBODY, 1);
@@ -315,13 +389,35 @@
 		{
 			error_reporting(7);
 		}
+		private function http($url,$postData="")
+		{
+			$cookieJar = $this->cookieJar;
+			$header = array(
+				"User-Agent" => "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
+				);
+			$ch =curl_init();  
+			curl_setopt($ch,CURLOPT_URL,$url);   
+			curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);  
+			curl_setopt($ch,CURLOPT_HEADER,1);
+			if ($postData !="") {
+				curl_setopt($ch, CURLOPT_POST, 1);
+				curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+			}
+			curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+			curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieJar);
+			$res = curl_exec($ch);
+			curl_close($ch);
+			return $res;
+		}
+		private function getPingjiaoUrl($str)
+		{
+			preg_match_all("/[\'](.*?)[\']/",$str,$matches);
+			$url = $this->PreUrl."/jsxsd/xspj/pjtype_save.do?pj0502id=".trim($matches[1][0])."&pj08id=".trim($matches[1][1])."&type=".trim($matches[1][3])."&jg0101id=".trim($matches[1][2]);
+			return $url;
+		}
 	}
-	
-	$student = new CSU('4201150120','FLCwan20140607');
-	$student->login();
-	$re = $student->getRank();
-	//$re = $student->getLevelGrade();
-	//$student->cookieJar;
-	var_dump($re);
+	$stu = new CSU('4201150121','f675324370');
+	$stu -> login();
+	$stu->oneKeyPingjiao();
 
  ?>

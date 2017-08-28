@@ -29,6 +29,8 @@
 		获取该学生的最新课程表（若要查询第几周的成绩，需进一步处理数据）
 	5.getLevelGrade()
 		获取该学生的等级考试成绩（教务系统里存在的，可能不是最新的）
+	6.getPingjiaoInfo()
+		获取该学生的评教信息
 
 三·类属性介绍
 	1.userid
@@ -41,14 +43,26 @@
 		登录获取保存cookie的文件名
 	5.state
 		登录是否成功的状态(TRUE为成功，FALSE为失败)
+	6.pingjiaoInfo
+		评教信息为一键评教提供信息以及url
+	7.PreUrl
+		域名前缀http://csujwc.its.csu.edu.cn或者http://jwctest.its.csu.edu.cn/的任意一个
 四·依赖说明
 	为方便提取信息，仅用正则匹配有点麻烦，使用了simpleHtmlDom这个类库，相当于简单的html解析器，配合正则，快速定位自己需要的信息。
 	至于simpleHtmlDom使用方法具体查看./lib/simple_html_dom/example里内容或者查看手册./lib/simple_html_dom/manual
-五· csu.class.php与csu.classs1.php
-	这两个文件都可以使用只不过使用的链接不同
-	csu.class.php ：使用的链接的域名是 http://jwctest.its.csu.edu.cn
-	csu.class1.php ：使用的链接的域名是 http://csujwc.its.csu.edu.cn
+五· 教务系统域名问题
+	教务系统有两个域名可以使用，一个是http://csujwc.its.csu.edu.cn，另一个是测试用的http://jwctest.its.csu.edu.cn/
+	如果不加设置默认使用http://csujwc.its.csu.edu.cn
+	若想要设置使用那个域名，可在实例化对象之前使用setPreUrl方法
+	代码如下：
+	$student = new CSU($user,$pwd);
+	//传入参数1为使用http://csujwc.its.csu.edu.cn；传入参数2为使用http://jwctest.its.csu.edu.cn/
+	$student->setsetPreUrl(2);
+	$student->login();
+	。。。进行你的操作
+
 	暂时情况这两个链接都可以成功使用，目测jwctest这个将来教务处会关闭，但是知道这个域名的人也不多，（比较安全，你懂的~~~）
+
 五·类库应用
 	1.若只是简单应用，直接require_once('csu.class.php')实例化就可以简单应用
 	2.若要应用框架进行复杂使用，比如tp里面为了安全考虑已经资源文件只能放在public目录，默认设置的cookie目录是当前的的./cookie，但是tp5里可能无法在扩展类库文件夹（extend）直接创建临时文件，解决方法在实例化对象之后使用绝对路径设置cookie目录(PS.对该目录以及子文件必须要有读写权限否则可能会导致登录失败)
