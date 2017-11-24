@@ -10,20 +10,26 @@
 		public $pwd;
 		public $encoded;
 		public $cookieJar;
+		public $cookieJar_app;
+		private $app_cookie;
 		public $state ;
 		public $pingjiaoInfo;
 		private $PreUrl;
+		private $app_url;
+		public $app_state;
+		private $app_token;
 		function __construct($userid,$pwd)
 		{
 			$this->setPreUrl();
 			$this->userid = $userid;
 			$this->pwd = $pwd;
+			$this->app_url = "http://csujwc.its.csu.edu.cn/app.do?";
 			$this->warning();
 			
 		}
 		function __destruct()
 		{
-			$this->logout();
+			//$this->logout();
 		}
 		//登录
 		public function login()
@@ -397,7 +403,7 @@
 				);
 			$ch =curl_init();  
 			curl_setopt($ch,CURLOPT_URL,$url);   
-			curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);  
+			curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
 			curl_setopt($ch,CURLOPT_HEADER,1);
 			if ($postData !="") {
 				curl_setopt($ch, CURLOPT_POST, 1);
@@ -409,12 +415,192 @@
 			curl_close($ch);
 			return $res;
 		}
+		private function app_http($url,$postData="")
+		{
+			$header = array("Host: csujwc.its.csu.edu.cn",
+		"User-Agent: AppCanPlugin/00.00.0116 (iPhone; iOS 11.0.3; Scale/2.00)",
+		"Accept: application/json",
+		"Accept-Language: zh-Hans-CN;q=1",
+		"Accept-Encoding: gzip, deflate",
+		"Connection: keep-alive",
+		"x-mas-app-id: 11435752",
+		"appverify: md5=88a9c4a46be1183e4f0c7fe36292ae0f;ts=1510975299698;",
+		"token: ".$this->app_token,
+		"X-QZ-APP-INFO: 11435727/public",
+		"Content-Length: 0",
+		"Content-Type: application/x-www-form-urlencoded",
+		"Pragma: no-cache",
+		"Cache-Control: no-cache");	
+			$ch =curl_init();  
+			curl_setopt($ch,CURLOPT_URL,$url);   
+			curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);  
+			curl_setopt($ch,CURLOPT_HEADER,0);
+			if ($postData !="") {
+				curl_setopt($ch, CURLOPT_POST, 1);
+				curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+			}
+			curl_setopt($ch, CURLINFO_HEADER_OUT, true);
+			curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+			curl_setopt($ch, CURLOPT_COOKIE, $this->app_cookie);
+			$res3 = curl_exec($ch);
+			$hea = curl_getinfo($ch,CURLINFO_HEADER_OUT);
+			curl_close($ch);
+			return $res3;
+		}
 		private function getPingjiaoUrl($str)
 		{
 			preg_match_all("/[\'](.*?)[\']/",$str,$matches);
 			$url = $this->PreUrl."/jsxsd/xspj/pjtype_save.do?pj0502id=".trim($matches[1][0])."&pj08id=".trim($matches[1][1])."&type=".trim($matches[1][3])."&jg0101id=".trim($matches[1][2]);
 			return $url;
 		}
+		#弱智系统教务系统app接口
+		public function app_login()
+		{
+			$url = $this->app_url."method=authUser&xh=".$this->userid."&pwd=".$this->pwd;
+			$ch = curl_init($url); //初始化
+			curl_setopt($ch,CURLOPT_HEADER,1); //将头文件的信息作为数据流输出
+			curl_setopt($ch,CURLOPT_RETURNTRANSFER,1); //返回获取的输出文本流
+			$content = curl_exec($ch); //执行curl并赋值给$content
+			preg_match_all('/Set-Cookie:(.*);/',$content,$str); //正则匹配
+			preg_match_all('/(.*)}/',$content,$res1);
+			$this->app_cookie = $str[1]; //获得COOKIE（SESSIONID）
+			curl_close($ch); //关闭curl
+			$res1 = $res1[0][0];
+			$res = json_decode($res1,JSON_UNESCAPED_UNICODE);
+			if (trim($res['msg'])=="登录成功") {
+				$this->app_state = TRUE;
+				$this->app_token = $res['token'];
+			}else{
+				$this->app_state = FALSE;
+			}
+			return $res1;
+		}
+		//获取学年学期
+		public function app_getXnxq($userid=0)
+		{
+			$xh=$userid?$userid:$this->userid;
+			$url = "http://csujwc.its.csu.edu.cn/app.do?method=getXnxq&xh=".$xh;
+			return $this->app_http($url);
+		}
+		public function app_getCurrentTime()
+		{
+			$url = $this->app_url."method=getCurrentTime&currDate=".date('Y-m-d',time());
+			return $this->app_http($url);
+		}
+		#获取用户信息，传入用户学号
+		public function app_getUserInfo($userid=0)
+		{
+			if ($userid==0) {
+				$url = $this->app_url."method=getUserInfo&xh=".$this->userid;
+			}else{
+				$url = $this->app_url."method=getUserInfo&xh=".$userid;
+			}
+			return $this->app_http($url);
+			
+		}
+		#获取学生信息(推送专用)暂时无法使用flag=0
+		public function app_getStudentIdInfo($userid=0)
+		{
+			if ($userid==0) {
+				$url = $this->app_url."method=getStudentIdInfo&xh=".$this->userid;
+			}else{
+				$url = $this->app_url."method=getStudentIdInfo&xh=".$userid;
+			}
+			return $this->app_http($url);
+		}
+		#查询课表
+		public function app_getKbcxAzc($userid=0,$xnxqid='2017-2018-1',$zc=11)
+		{
+			if ($userid==0) {
+				$url = $this->app_url."method=getKbcxAzc&xh=".$this->userid."&xnxqid=$xnxqid&zc=$zc";
+			}else{
+				$url = $this->app_url."method=getKbcxAzc&xh=".$userid."&xnxqid=$xnxqid&zc=$zc";
+			}
+			return $this->app_http($url);
+		}
+		#教室查询
+		public function app_getKxJscx($value='')
+		{
+			$time = date("Y-m-d",time());
+			$idleTime = ['allday','am','pm','night','0102','0304','0506','0708'];
+			$xqid = ['校本部'=>1,'南校区'=>2,'铁道校区'=>3,'湘雅新校区'=>4,'湘雅老校区'=>5,'湘雅医院'=>6,'湘雅二医院'=>7,'湘雅三医院'=>8,'新校区'=>9];
+			#教室容量
+			$num = ['_30','30-40','40-50','%2B60'];
+			$url = $this->app_url."method=getKxJscx&time=$time&idleTime=".$idleTime[4]."&xqid=".$xqid['新校区']."&jxlid={jxlid}&classroomNumber={num}";
+			echo $url;
+			var_dump($idleTime);
+		}
+		//成绩查询
+		public function app_getCjcx($userid=0)
+		{
+			$xnxqid = ["2013-2014-1","2013-2014-2","2014-2015-1","2014-2015-2","2015-2016-1","2015-2016-2","2016-2017-1","2016-2017-2","2017-2018-1"];
+			$xh=$userid?$userid:$this->userid;
+			$url = $this->app_url."method=getCjcx&xh=".$xh."&xnxqid=".array_reverse($xnxqid)[1];
+			return $this->app_http($url);
+		}
+		public function app_getAllgrades($userid=0)
+		{
+			$xnxqid = ["2013-2014-1","2013-2014-2","2014-2015-1","2014-2015-2","2015-2016-1","2015-2016-2","2016-2017-1","2016-2017-2","2017-2018-1"];
+			$xh=$userid?$userid:$this->userid;
+			$url = $this->app_url."method=getCjcx&xh=".$xh;
+			return $this->app_http($url);
+		}
+		//考试查询
+		public function app_getKscx($userid=0)
+		{
+			$xh=$userid?$userid:$this->userid;
+			$url = $this->app_url."method=getKscx&xh=".$xh;
+			return $this->app_http($url);
+		}
+		//学籍预警
+		public function app_getEarlyWarnInfo($userid=0)
+		{
+			$xh=$userid?$userid:$this->userid;
+			$url = $this->app_url."method=getEarlyWarnInfo&xh=".$xh."&history=";echo $url;
+			return [$this->app_http($url."0"),$this->app_http($url."1")];
+		}
+		//校区查询
+		public function app_getXqcx()
+		{
+			$url = "http://csujwc.its.csu.edu.cn/app.do?method=getXqcx";
+			return $this->app_http($url);
+		}
+		//院系查询
+		public function app_getYxcx()
+		{
+			$url = "http://csujwc.its.csu.edu.cn/app.do?method=getYxcx";
+			return $this->app_http($url);
+		}
+		//专业查询
+		public function app_getZycx()
+		{
+			$url = "http://csujwc.its.csu.edu.cn/app.do?method=getZycx";
+			return $this->app_http($url);
+		}
+		//教学楼查询
+		public function app_getJxlcx($xqid=9)
+		{
+			$url = "http://csujwc.its.csu.edu.cn/app.do?method=getJxlcx&xqid=".$xqid;
+			return $this->app_http($url);
+		}
 	}
 
+	$student = new CSU("4201150121",'f675324370');
+	// $student->login();
+	// if ($student->state) {
+	// 	var_dump($re = $student->getSubjectTimetable());
+	// }
+	$student->app_login();
+	// echo $student->app_getKbcxAzc('0701150108','2016-2017-2',3);
+	// echo $student->app_getCurrentTime();
+	// echo $student->app_getKxJscx();
+	// echo $student->app_getUserInfo();
+	// echo $student->app_getCjcx();
+	// var_dump($student->app_getKscx());
+	// var_dump($student->app_getEarlyWarnInfo());
+	// echo $student->app_getXqcx();
+	// echo $student->app_getYxcx();
+	// echo $student->app_getZycx();
+	// echo $student->app_getJxlcx(1);
+	// echo $student->app_getXnxq();
  ?>
